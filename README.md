@@ -12,7 +12,36 @@ Desk Note 是一个轻量级 Windows 桌面便利贴待办应用，基于 Tauri�
 - 支持收缩到小窗口和恢复到展开尺寸。
 - 系统托盘常驻，窗口不显示在任务栏。
 
-## Windows 编译环境
+## 推荐编译方式：GitHub Actions 云端编译
+
+如果你的 Windows 电脑不能安装或运行 Docker、Node.js，推荐使用 GitHub Actions 云端编译。你的电脑只需要能把代码推送到 GitHub，不需要本地安装 Node、Rust 或 Docker。
+
+已提供 workflow：
+
+```text
+.github/workflows/build-windows.yml
+```
+
+使用方式：
+
+1. 把仓库推送到 GitHub。
+2. 打开 GitHub 仓库页面。
+3. 进入 `Actions`。
+4. 选择 `Build Windows`。
+5. 点击 `Run workflow`。
+6. 等待任务结束后，在页面底部下载 artifact：`desk-note-windows`。
+
+该 artifact 会包含生成的 Windows 程序或安装包，常见文件包括：
+
+```text
+desk-note.exe
+*.exe
+*.msi
+```
+
+这个方式仍然会在 GitHub 的 Windows runner 上使用 Node.js、Rust 和 MSVC，但这些依赖都运行在 GitHub 云端，不需要你的 Windows 电脑安装。
+
+## 本地 Windows 编译环境
 
 在 Windows 10/11 x64 上安装：
 
@@ -22,6 +51,8 @@ Desk Note 是一个轻量级 Windows 桌面便利贴待办应用，基于 Tauri�
 4. WebView2 Runtime。Windows 11 通常自带；Windows 10 如果缺失，需要安装。
 
 ## 一键编译脚本
+
+如果你的 Windows 电脑可以使用 Node.js 和 Rust，可以用本地脚本编译。
 
 在 PowerShell 里进入项目目录：
 
