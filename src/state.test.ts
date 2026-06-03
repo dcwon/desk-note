@@ -10,6 +10,8 @@ import {
   getActivePage,
   renamePage,
   reorderTodo,
+  restoreCompleted,
+  setCompletedVisible,
   updateTodo
 } from "./state";
 
@@ -29,6 +31,7 @@ describe("desk note state", () => {
     expect(data.pages).toHaveLength(1);
     expect(data.activePageId).toBe(data.pages[0].id);
     expect(data.pages[0].title).toBe("Todos");
+    expect(data.completedVisible).toBe(false);
   });
 
   it("adds and renames pages while keeping the new page active", () => {
@@ -66,6 +69,29 @@ describe("desk note state", () => {
     const deleted = deleteCompleted(completed, completed.activePageId, completedId);
 
     expect(getActivePage(deleted).completed).toHaveLength(0);
+  });
+
+  it("restores completed items to the active todo list", () => {
+    const withTodo = addTodo(createDefaultData(), "Follow up", clock);
+    const todoId = getActivePage(withTodo).todos[0].id;
+    const completed = completeTodo(withTodo, withTodo.activePageId, todoId, clock);
+    const completedId = getActivePage(completed).completed[0].id;
+    const restored = restoreCompleted(completed, completed.activePageId, completedId);
+    const activePage = getActivePage(restored);
+
+    expect(activePage.completed).toHaveLength(0);
+    expect(activePage.todos).toHaveLength(1);
+    expect(activePage.todos[0].text).toBe("Follow up");
+  });
+
+  it("toggles completed visibility without changing todos", () => {
+    const withTodo = addTodo(createDefaultData(), "Keep visibility separate", clock);
+    const shown = setCompletedVisible(withTodo, true);
+    const hidden = setCompletedVisible(shown, false);
+
+    expect(shown.completedVisible).toBe(true);
+    expect(hidden.completedVisible).toBe(false);
+    expect(getActivePage(hidden).todos).toEqual(getActivePage(withTodo).todos);
   });
 
   it("reorders active todos by drag source and target index", () => {
@@ -119,5 +145,6 @@ describe("desk note state", () => {
     expect(data.pages[0].title).toBe("Untitled");
     expect(data.pages[0].todos[0].text).toBe("Keep me");
     expect(data.pages[0].completed).toEqual([]);
+    expect(data.completedVisible).toBe(false);
   });
 });

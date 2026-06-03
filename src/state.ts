@@ -26,6 +26,7 @@ export type DeskNoteData = {
   pages: TodoPage[];
   expandedWindowSize?: WindowSize;
   compact: boolean;
+  completedVisible: boolean;
 };
 
 type Clock = () => number;
@@ -52,7 +53,8 @@ export const createDefaultData = (): DeskNoteData => {
     version: 1,
     activePageId: page.id,
     pages: [page],
-    compact: false
+    compact: false,
+    completedVisible: false
   };
 };
 
@@ -169,7 +171,8 @@ export const ensureValidData = (input: unknown): DeskNoteData => {
     activePageId,
     pages,
     expandedWindowSize: sanitizeSize(input.expandedWindowSize),
-    compact: Boolean(input.compact)
+    compact: Boolean(input.compact),
+    completedVisible: Boolean(input.completedVisible)
   };
 };
 
@@ -311,6 +314,26 @@ export const deleteCompleted = (
   }));
 };
 
+export const restoreCompleted = (
+  data: DeskNoteData,
+  pageId: string,
+  completedId: string
+): DeskNoteData => {
+  return updatePage(data, pageId, (page) => {
+    const completed = page.completed.find((item) => item.id === completedId);
+    if (!completed) {
+      return page;
+    }
+
+    const { completedAt: _completedAt, ...todo } = completed;
+    return {
+      ...page,
+      todos: [...page.todos, todo],
+      completed: page.completed.filter((item) => item.id !== completedId)
+    };
+  });
+};
+
 export const reorderTodo = (
   data: DeskNoteData,
   pageId: string,
@@ -355,4 +378,12 @@ export const setCompactState = (
   ...data,
   compact,
   expandedWindowSize: expandedWindowSize ?? data.expandedWindowSize
+});
+
+export const setCompletedVisible = (
+  data: DeskNoteData,
+  completedVisible: boolean
+): DeskNoteData => ({
+  ...data,
+  completedVisible
 });

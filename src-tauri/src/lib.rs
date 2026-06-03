@@ -19,6 +19,23 @@ fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
         .ok_or_else(|| "main window is not available".to_string())
 }
 
+fn configure_note_window(window: &WebviewWindow) {
+    let _ = window.set_decorations(false);
+    let _ = window.set_skip_taskbar(true);
+    let _ = window.set_always_on_top(true);
+}
+
+fn show_and_focus_window(window: &WebviewWindow) -> Result<(), String> {
+    configure_note_window(window);
+    window
+        .show()
+        .map_err(|error| format!("failed to show window: {error}"))?;
+    window
+        .set_focus()
+        .map_err(|error| format!("failed to focus window: {error}"))?;
+    Ok(())
+}
+
 fn data_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     let dir = app
         .path()
@@ -50,39 +67,29 @@ fn save_data(app: AppHandle, data: String) -> Result<(), String> {
 #[tauri::command]
 fn set_compact_window(app: AppHandle) -> Result<(), String> {
     let window = main_window(&app)?;
+    configure_note_window(&window);
     window
-        .set_size(PhysicalSize::new(360_u32, 104_u32))
+        .set_size(PhysicalSize::new(280_u32, 64_u32))
         .map_err(|error| format!("failed to resize compact window: {error}"))?;
-    window
-        .set_always_on_top(true)
-        .map_err(|error| format!("failed to keep compact window on top: {error}"))?;
     Ok(())
 }
 
 #[tauri::command]
 fn restore_window(app: AppHandle, width: u32, height: u32) -> Result<(), String> {
     let window = main_window(&app)?;
+    configure_note_window(&window);
     let width = width.max(280);
     let height = height.max(240);
     window
         .set_size(PhysicalSize::new(width, height))
         .map_err(|error| format!("failed to restore window size: {error}"))?;
-    window
-        .set_always_on_top(true)
-        .map_err(|error| format!("failed to keep restored window on top: {error}"))?;
     Ok(())
 }
 
 #[tauri::command]
 fn show_main_window(app: AppHandle) -> Result<(), String> {
     let window = main_window(&app)?;
-    window
-        .show()
-        .map_err(|error| format!("failed to show window: {error}"))?;
-    window
-        .set_focus()
-        .map_err(|error| format!("failed to focus window: {error}"))?;
-    Ok(())
+    show_and_focus_window(&window)
 }
 
 fn install_tray(app: &tauri::App) -> tauri::Result<()> {
@@ -103,8 +110,7 @@ fn install_tray(app: &tauri::App) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => {
                 if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
+                    let _ = show_and_focus_window(&window);
                 }
             }
             "hide" => {
@@ -128,8 +134,7 @@ fn install_tray(app: &tauri::App) -> tauri::Result<()> {
             } = event
             {
                 if let Some(window) = tray.app_handle().get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
+                    let _ = show_and_focus_window(&window);
                 }
             }
         })
@@ -143,6 +148,9 @@ pub fn run() {
         .manage(QuitState::default())
         .setup(|app| {
             install_tray(app)?;
+            if let Some(window) = app.get_webview_window("main") {
+                configure_note_window(&window);
+            }
             Ok(())
         })
         .on_window_event(|window, event| {

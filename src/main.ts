@@ -10,8 +10,10 @@ import {
   getActivePage,
   renamePage,
   reorderTodo,
+  restoreCompleted,
   setActivePage,
   setCompactState,
+  setCompletedVisible,
   updateTodo,
   type DeskNoteData,
   type TodoPage
@@ -34,6 +36,7 @@ let data: DeskNoteData = createDefaultData();
 let draggedIndex: number | null = null;
 let editingTodoId: string | null = null;
 let editingPageId: string | null = null;
+let contextMenuPosition: { x: number; y: number } | null = null;
 let statusText = "Loading";
 
 const escapeHtml = (value: string): string =>
@@ -116,6 +119,7 @@ const renderCompleted = (page: TodoPage): string => {
     .map(
       (item) => `<li class="completed-row">
         <span>${escapeHtml(item.text)}</span>
+        <button class="text-button restore-button" type="button" data-action="restore-completed" data-page-id="${page.id}" data-completed-id="${item.id}" aria-label="Restore completed item" title="Restore">Restore</button>
         <button class="icon-button delete-button" type="button" data-action="delete-completed" data-page-id="${page.id}" data-completed-id="${item.id}" aria-label="Delete completed item" title="Delete permanently">×</button>
       </li>`
     )
@@ -125,6 +129,12 @@ const renderCompleted = (page: TodoPage): string => {
 const render = (): void => {
   const page = getActivePage(data);
   document.body.classList.toggle("is-compact", data.compact);
+  const completedExpanded = data.completedVisible ? "true" : "false";
+  const contextMenu = contextMenuPosition
+    ? `<div class="context-menu" style="left: ${contextMenuPosition.x}px; top: ${contextMenuPosition.y}px;" role="menu">
+        <button class="context-menu-button" type="button" data-action="expand" role="menuitem">Expand</button>
+      </div>`
+    : "";
 
   app.innerHTML = `
     <section class="desk-note-shell">
@@ -136,9 +146,9 @@ const render = (): void => {
             <span>${activeCountText(page)}</span>
           </div>
         </div>
-        <div class="window-actions">
-          <button class="icon-button" type="button" data-action="${data.compact ? "expand" : "compact"}" aria-label="${data.compact ? "Expand" : "Collapse"}" title="${data.compact ? "Expand" : "Collapse"}">${data.compact ? "□" : "−"}</button>
-        </div>
+        ${data.compact ? "" : `<div class="window-actions">
+          <button class="icon-button" type="button" data-action="compact" aria-label="Collapse" title="Collapse">−</button>
+        </div>`}
       </header>
 
       <nav class="page-strip" aria-label="Todo pages">
@@ -159,13 +169,14 @@ const render = (): void => {
         </section>
 
         <section class="completed-section" aria-label="Completed todos">
-          <div class="section-heading">
+          <button class="completed-toggle section-heading" type="button" data-action="toggle-completed" aria-expanded="${completedExpanded}">
             <span>Completed</span>
             <small>${page.completed.length}</small>
-          </div>
-          <ul class="completed-list">
-            ${renderCompleted(page)}
-          </ul>
+            <span class="toggle-label">${data.completedVisible ? "Hide" : "Show"}</span>
+          </button>
+          ${data.completedVisible ? `<ul class="completed-list">
+              ${renderCompleted(page)}
+            </ul>` : ""}
         </section>
       </section>
 
@@ -174,6 +185,7 @@ const render = (): void => {
         <button class="text-button danger" type="button" data-action="delete-page">Delete page</button>
         <span class="save-status">${escapeHtml(statusText)}</span>
       </footer>
+      ${contextMenu}
     </section>`;
 };
 
@@ -182,6 +194,7 @@ const buttonTarget = (target: EventTarget | null): HTMLButtonElement | null => {
 };
 
 const handleAction = async (button: HTMLButtonElement): Promise<void> => {
+  contextMenuPosition = null;
   const action = button.dataset.action;
   const pageId = button.dataset.pageId;
   const todoId = button.dataset.todoId;
@@ -234,6 +247,16 @@ const handleAction = async (button: HTMLButtonElement): Promise<void> => {
     return;
   }
 
+  if (action === "restore-completed" && pageId && completedId) {
+    updateData(restoreCompleted(data, pageId, completedId));
+    return;
+  }
+
+  if (action === "toggle-completed") {
+    updateData(setCompletedVisible(data, !data.completedVisible));
+    return;
+  }
+
   if (action === "compact") {
     const size = await readCurrentWindowSize();
     updateData(setCompactState(data, true, size));
@@ -251,9 +274,28 @@ const handleAction = async (button: HTMLButtonElement): Promise<void> => {
 app.addEventListener("click", (event) => {
   const button = buttonTarget(event.target);
   if (!button) {
+    if (contextMenuPosition) {
+      contextMenuPosition = null;
+      render();
+    }
     return;
   }
   void handleAction(button);
+});
+
+app.addEventListener("contextmenu", (event) => {
+  if (!data.compact) {
+    return;
+  }
+
+  event.preventDefault();
+  const menuWidth = 128;
+  const menuHeight = 42;
+  contextMenuPosition = {
+    x: Math.max(8, Math.min(event.clientX, window.innerWidth - menuWidth - 8)),
+    y: Math.max(8, Math.min(event.clientY, window.innerHeight - menuHeight - 8))
+  };
+  render();
 });
 
 app.addEventListener("submit", (event) => {
@@ -293,6 +335,12 @@ app.addEventListener("focusout", (event) => {
 });
 
 app.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && contextMenuPosition) {
+    contextMenuPosition = null;
+    render();
+    return;
+  }
+
   const input = event.target;
   if (!(input instanceof HTMLInputElement)) {
     return;
@@ -352,6 +400,10 @@ app.addEventListener("drop", (event) => {
 });
 
 app.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0) {
+    return;
+  }
+
   const target = event.target;
   if (!(target instanceof Element) || !target.closest("[data-drag-region]")) {
     return;
